@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Entorno Laboral Virtual</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        .contenedor-tarea {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 800px;
+            margin: 30px auto;
+            border-top: 5px solid #007bff;
+        }
+        h1 {
+            color: #0056b3;
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 2.2em;
+        }
+        h2 {
+            color: #007bff;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+            margin-top: 30px;
+            font-size: 1.8em;
+        }
+        h3 {
+            color: #495057;
+            margin-top: 25px;
+            font-size: 1.4em;
+        }
+        p {
+            margin-bottom: 10px;
+        }
+        strong {
+            color: #dc3545; /* Rojo para la dificultad */
+        }
+        textarea {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-top: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            font-size: 1.1em;
+            min-height: 120px;
+            resize: vertical;
+        }
+        .button-group {
+            text-align: center;
+            margin-top: 20px;
+        }
+        button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1.1em;
+            margin: 5px;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            background-color: #cccccc !important;
+            cursor: not-allowed;
+        }
+        .btn-send-text {
+            background-color: #28a745; /* Verde */
+            color: white;
+        }
+        .btn-record {
+            background-color: #007bff; /* Azul */
+            color: white;
+        }
+        .btn-stop {
+            background-color: #dc3545; /* Rojo */
+            color: white;
+        }
+        .btn-send-voice {
+            background-color: #ffc107; /* Amarillo */
+            color: white;
+        }
+        hr {
+            border: 0;
+            height: 1px;
+            background: #e9ecef;
+            margin: 40px 0;
+        }
+        .feedback-box {
+            background-color: #e9f7ef; /* Fondo verde claro */
+            border-left: 5px solid #28a745; /* Borde verde */
+            padding: 15px 20px;
+            border-radius: 5px;
+            margin-top: 20px;
+            color: #155724; /* Texto verde oscuro */
+        }
+        .expected-response-box {
+            background-color: #f8f9fa; /* Fondo gris claro */
+            border-left: 5px solid #007bff; /* Borde azul */
+            padding: 15px 20px;
+            border-radius: 5px;
+            margin-top: 20px;
+            color: #004085; /* Texto azul oscuro */
+        }
+        .transcribed-text-box {
+            background-color: #fff3cd; /* Fondo amarillo claro */
+            border-left: 5px solid #ffc107; /* Borde amarillo */
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            color: #856404; /* Texto amarillo oscuro */
+            font-style: italic;
+        }
+        .no-tarea {
+            text-align: center;
+            font-size: 1.3em;
+            color: #777;
+            padding: 50px 0;
+        }
+        .error-message {
+            color: #dc3545;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 15px;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="contenedor-tarea">
+        {% if tarea %}
+            <h1>¡Bienvenido al Simulador de Trabajo!</h1>
+            <p>Tu próxima tarea es:</p>
+            <h2>{{ tarea.nombre }}</h2>
+            <p><strong>Dificultad:</strong> {{ tarea.dificultad }}</p>
+            <h3>Descripción de la Tarea:</h3>
+            <p>{{ tarea.descripcion }}</p>
+
+            <hr>
+
+            <h3>1. Escribe tu respuesta:</h3>
+            <form method="post" action="{% url 'mostrar_tarea' %}" id="form-respuesta-texto">
+                {% csrf_token %} <textarea name="respuesta_usuario" id="textarea-respuesta" placeholder="Escribe aquí tu respuesta a la tarea..."></textarea><br>
+                <div class="button-group">
+                    <button type="submit" class="btn-send-text">Enviar Respuesta Escrita</button>
+                </div>
+            </form>
+
+            <hr>
+
+            <h3>2. O dicta tu respuesta por voz:</h3>
+            <div class="button-group">
+                <button id="start-record-btn" class="btn-record">🎙️ Grabar Voz</button>
+                <button id="stop-record-btn" class="btn-stop" disabled>🛑 Detener Grabación</button>
+                <button id="send-voice-btn" class="btn-send-voice" disabled>🚀 Enviar Voz</button>
+            </div>
+            <p id="recording-status" style="margin-top: 10px; text-align: center; font-weight: bold; color: #555;">Pulsa "Grabar Voz" para empezar.</p>
+
+            {% if respuesta_transcrita %}
+                <div class="transcribed-text-box">
+                    <p><strong>Tu voz fue transcrita a texto como:</strong> <em>"{{ respuesta_transcrita }}"</em></p>
+                </div>
+            {% endif %}
+
+            {% if mensaje_error_audio %}
+                <div class="error-message">
+                    <p>{{ mensaje_error_audio }}</p>
+                </div>
+            {% endif %}
+
+            {% if feedback_ia %}
+                <hr>
+                <h3>Feedback de la IA:</h3>
+                <div class="feedback-box">
+                    <p>{{ feedback_ia }}</p>
+                </div>
+                <h3>Respuesta Esperada:</h3>
+                <div class="expected-response-box">
+                    <p>{{ tarea.respuesta_esperada }}</p>
+                </div>
+            {% endif %}
+
+        {% else %}
+            <div class="no-tarea">
+                <p>¡Vaya! Parece que no hay tareas de simulación creadas todavía.</p>
+                <p>Por favor, ve al panel de administración para agregar algunas:</p>
+                <p><a href="/admin/">Ir al Administrador de Django</a></p>
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob;
+        const startRecordBtn = document.getElementById('start-record-btn');
+        const stopRecordBtn = document.getElementById('stop-record-btn');
+        const sendVoiceBtn = document.getElementById('send-voice-btn');
+        const recordingStatus = document.getElementById('recording-status');
+        const textareaRespuesta = document.getElementById('textarea-respuesta');
+        const formTexto = document.getElementById('form-respuesta-texto'); // El formulario para el texto
+
+        // Función para obtener el token CSRF (seguridad de Django)
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    // Does this cookie string begin with the name we want?
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        const csrftoken = getCookie('csrftoken');
+
+        // Deshabilita el textarea si ya hay una transcripción previa al cargar la página
+        // Y habilita/deshabilita botones de voz según si hay texto o no
+        if (textareaRespuesta.value.length > 0) {
+            startRecordBtn.disabled = true;
+            stopRecordBtn.disabled = true;
+            sendVoiceBtn.disabled = true;
+        } else {
+            startRecordBtn.disabled = false;
+        }
+
+        // Listener para cuando el usuario escribe en el textarea
+        textareaRespuesta.addEventListener('input', () => {
+            if (textareaRespuesta.value.length > 0) {
+                // Si hay texto, deshabilitar la grabación de voz
+                startRecordBtn.disabled = true;
+                stopRecordBtn.disabled = true;
+                sendVoiceBtn.disabled = true;
+            } else {
+                // Si no hay texto, permitir grabar voz
+                startRecordBtn.disabled = false;
+            }
+            // Limpiar cualquier estado de grabación si empieza a escribir
+            recordingStatus.textContent = 'Pulsa "Grabar Voz" para empezar.';
+        });
+
+        startRecordBtn.onclick = async () => {
+            try {
+                // Pedir permiso al usuario para usar el micrófono
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' }); // Puedes probar 'audio/wav' si webm da problemas en el backend
+
+                audioChunks = []; // Reiniciar chunks para una nueva grabación
+
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data); // Guardar los datos de audio
+                };
+
+                mediaRecorder.onstop = () => {
+                    audioBlob = new Blob(audioChunks, { type: 'audio/wav' }); // Crea un BLOB de audio (como un archivo)
+                    sendVoiceBtn.disabled = false; // Habilitar botón de enviar
+                    recordingStatus.textContent = 'Grabación finalizada. Pulsa "Enviar Voz".';
+                };
+
+                mediaRecorder.start(); // Iniciar grabación
+                startRecordBtn.disabled = true; // Deshabilitar grabar
+                stopRecordBtn.disabled = false; // Habilitar detener
+                sendVoiceBtn.disabled = true; // Deshabilitar enviar
+                textareaRespuesta.disabled = true; // Deshabilitar escritura manual
+                textareaRespuesta.value = ''; // Limpiar textarea si el usuario decide dictar
+                recordingStatus.textContent = 'Grabando... (Pulsa "Detener Grabación" para terminar)';
+
+            } catch (err) {
+                console.error('Error al acceder al micrófono:', err);
+                recordingStatus.textContent = 'Error al acceder al micrófono. Asegúrate de dar permiso.';
+                alert('No se pudo acceder al micrófono. Asegúrate de dar los permisos necesarios en tu navegador.');
+                startRecordBtn.disabled = false;
+                stopRecordBtn.disabled = true;
+                sendVoiceBtn.disabled = true;
+                textareaRespuesta.disabled = false; // Habilitar textarea de nuevo
+            }
+        };
+
+        stopRecordBtn.onclick = () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop(); // Detener la grabación
+                // Después de stop, se dispara mediaRecorder.onstop
+                startRecordBtn.disabled = false; // Habilitar grabar de nuevo
+                stopRecordBtn.disabled = true; // Deshabilitar detener
+            }
+        };
+
+        sendVoiceBtn.onclick = () => {
+            if (audioBlob) {
+                // Crear un objeto FormData para enviar archivos y otros datos al servidor
+                const formData = new FormData();
+                formData.append('csrfmiddlewaretoken', csrftoken); // Añadir el token CSRF para seguridad
+                formData.append('audio_respuesta', audioBlob, 'grabacion.wav'); // Añadir el archivo de audio
+
+                recordingStatus.textContent = 'Enviando audio...';
+                sendVoiceBtn.disabled = true; // Deshabilitar el botón mientras se envía
+
+                // Enviar el audio al servidor usando fetch (una forma moderna de hacer peticiones web)
+                fetch(formTexto.action, { // Usamos la misma URL del formulario de texto
+                    method: 'POST',
+                    body: formData,
+                })
+                .then(response => response.text()) // Esperar la respuesta del servidor como texto (HTML)
+                .then(html => {
+                    // Reemplazamos todo el contenido del documento con la nueva página HTML
+                    // Esto recarga la página con el feedback de la IA
+                    document.open();
+                    document.write(html);
+                    document.close();
+                })
+                .catch(error => {
+                    console.error('Error al enviar el audio:', error);
+                    recordingStatus.textContent = 'Error al enviar el audio. Revisa la consola.';
+                    sendVoiceBtn.disabled = false; // Re-habilitar para reintentar
+                });
+            }
+        };
+
+    </script>
+</body>
+</html>
